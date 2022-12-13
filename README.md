@@ -2,7 +2,7 @@
 
 This repo contains some of my livebook notebooks.
 
-*Este repo contiene algunos de mis cuadernos de livebooks.* 🇪🇸
+ 🇪🇸 *Este repo contiene algunos de mis cuadernos de livebooks.*
 
 ## Completed notebooks (*Cuadernos terminados*)
 
