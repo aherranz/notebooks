@@ -385,7 +385,7 @@ Ecto.Migrator.run(Repo, [{3, Chuleta.Repo.Migrations.AddUniqueIndexName}], :up, 
 
 * Comprobamos ahora el resultado al intentar añadir dos artistas con el mismo nombre
 
-## Antipatrón: no usar changesets
+## Antipatrón: no usar changesets con datos "externos"
 
 ```elixir
 a = Repo.get_by(Artist, name: "Supertramp")
@@ -396,7 +396,7 @@ Repo.update(%Artist{a | name: "Supertramp. The group"})
 Repo.insert(%Artist{name: "Pink Floyd"})
 ```
 
-## Asociaciones N:1
+## Asociaciones N:1: "colecciones"
 
 * Lo realmente importante en nuestros modelos son las asociaciones porque [las entidades son un *placebo*](https://babel.upm.es/~angel/posts/2022/03/uml-las-clases-son-un-placebo/) 🤪
 * Ecto, como otras bibliotecas, ofrece una forma de capturar las asociaciones del modelo y sus multiplicidades
@@ -532,24 +532,55 @@ tangana = Repo.get_by(Artist, name: "C. Tangana")
 %Album{} |> Album.changeset(%{title: "El Madrileño", released: "2021-02-26"})
 ```
 
-## Patrón: crear y añadir a una "colección"
+## Patrón: añadir a una "colección" de uno en uno
+
+* `Ecto.build_assoc` genera un nuevo *schema* (**no lo hace persistente**)
 
 ```elixir
 tangana |> Ecto.build_assoc(:albums)
 ```
 
-## Preload
+* Vamos a crear un par de álbumes
+
+```elixir
+tangana |> Ecto.build_assoc(:albums, title: "Idolo", released: "2017-10-06") |> Repo.insert()
+```
+
+* ¡Eso era un antipatrón! (la fecha parece ser un dato externo sobre el que no se tiene control)
 
 ```elixir
 tangana
+|> Ecto.build_assoc(:albums)
+|> Album.changeset(%{title: "El Madrileño", released: "2021"})
+|> Repo.insert()
+```
+
+## Preload
+
+```elixir
+tangana = Repo.get_by(Artist, name: "C. Tangana")
 ```
 
 * ¿Para qué está ese campo `albums` y qué significa *not loaded*?
-* Es una importante cuestión de eficiencia: por defecto las asociaciones no se *precargan*
+* Por defecto las asociaciones no se *precargan*: **eficiencia**
 
 ```elixir
 tangana |> Repo.preload(:albums)
 ```
+
+```elixir
+tangana.albums
+```
+
+## Antipatrón: preload => 1 + X queries
+
+```elixir
+Repo.get_by(Artist, name: "C. Tangana") |> Repo.preload(:albums)
+```
+
+
+
+## Poblado
 
 ```elixir
 supertramp = Repo.get_by!(Artist, name: "Supertramp")
@@ -560,28 +591,73 @@ supertramp = Repo.get_by!(Artist, name: "Supertramp")
 ```
 
 ```elixir
-supertramp |> Ecto.build_assoc(:albums, title: "Crime of the century")
+supertramp |> Ecto.build_assoc(:albums, title: "Crime of the century") |> Repo.insert()
 ```
 
 ```elixir
-supertramp |> Ecto.build_assoc(:albums, title: "Crisis? What Crisis?")
+supertramp |> Ecto.build_assoc(:albums, title: "Crisis? What Crisis?") |> Repo.insert()
 ```
 
+## Queries
 
+* Hasta ahora nuestras queries han sido nimias (`Repo.get_by`)
+* En el [*query API de Repo*](https://hexdocs.pm/ecto/Ecto.Repo.html#query-api) se pueden encontrar operaciones más potentes
 
 ```elixir
-supertramp |> Ecto.build_assoc(:al)
+Repo.all(Artist)
 ```
+
+* ¿Y si queremos hacer una *precarga* de todos los álbumes?
+
+```elixir
+for artist <- Repo.all(Artist) do
+  artist |> Repo.preload(:albums)
+end
+```
+
+* Ese antipatrón ya lo conocemos: 1+N queries
+* ¿Pero qué opciones tenemos?
+
+```elixir
+Repo.all(Artist) |> Repo.preload(:albums)
+```
+
+* ¿Y el DSL de `Ecto.Query`?
+
+```elixir
+import Ecto.Query, only: [from: 2]
+
+Repo.all(from(a in Artist, preload: :albums))
+```
+
+## Patrón: preload con join
+
+```elixir
+import Ecto, only: [assoc: 3]
+
+Repo.all(
+  from(ar in Artist,
+    left_join: al in assoc(ar, :albums),
+    preload: [albums: al]
+  )
+)
+```
+
+## WIP
+
+* Añadir una entrada en una colección
+* Modificar una entrada de colección
+* Modificar una colección por completo
 
 ## ...Famous Last Words...
 
 * Entender el mapping a diferentes niveles (tipos ,etc)
 * Clave binaria vs entera
 * En las migraciones se pueden codificar todas las restricciones habituales en SQL
-* Mi experiencia con este notebook (vs. slides)
 * Asociaciones transitivas
 * Asociaciones "polimórficas"
 * *Custom types*
 * *Upserts*
 * *Transactions*
 * Infinidad de detalles que de un modo u otro tienen que ver con el modelo relacional (ej. `on_conflict`)
+* Mi experiencia con este notebook (vs. slides)
