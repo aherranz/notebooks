@@ -643,11 +643,109 @@ Repo.all(
 )
 ```
 
+## Manejando la colección como un todo
+
+* Ya hemos visto que el uso de `Ecto.build_assoc` permite crear una entrada en un colección
+* ¿Pero qué pasa si necesitamos manejar la colección como un topo?
+* Ampliemos nuestro modelo con las canciones en los álbumes
+
+```elixir
+defmodule Chuleta.Model4.Track do
+  use TypedEctoSchema
+  alias Ecto.Changeset
+  alias Chuleta.Model3.Album
+
+  typed_schema "tracks" do
+    field(:title, :string)
+    # ordered!
+    field(:index, :integer)
+    belongs_to(:album, Album)
+
+    timestamps()
+  end
+
+  def changeset(data, params) do
+    data
+    |> Changeset.cast(params, [:title, :index])
+    |> Changeset.validate_required([:title, :index, :album_id])
+    |> Changeset.unique_constraint(:id, name: "tracks_pkey")
+  end
+end
+```
+
+* Añadimos `has_many` *tracks* a los álbumes
+
+```elixir
+defmodule Chuleta.Model4.Album do
+  use TypedEctoSchema
+  alias Ecto.Changeset
+  alias Chuleta.Model3.{Artist, Track}
+
+  typed_schema "albums" do
+    field(:title, :string)
+    field(:released, :date)
+    belongs_to(:artist, Artist)
+    has_many(:tracks, Track)
+
+    timestamps()
+  end
+
+  def changeset(data, params) do
+    data
+    |> Changeset.cast(params, [:title, :released])
+    |> Changeset.validate_required([:title, :artist_id])
+    |> Changeset.unique_constraint(:id, name: "albums_pkey")
+  end
+end
+```
+
+* Y por supuesto la migración correspondiente
+
+```elixir
+defmodule Chuleta.Repo.Migrations.CreateTracksTable do
+  use Ecto.Migration
+
+  def change do
+    create table("tracks") do
+      add(:title, :string, null: false)
+      add(:index, :integer, null: false)
+      add(:album_id, references("albums"), null: false)
+
+      timestamps()
+    end
+  end
+end
+```
+
+```elixir
+Ecto.Migrator.run(Repo, [{5, Chuleta.Repo.Migrations.CreateTracksTable}], :up, all: true)
+```
+
+```elixir
+alias Chuleta.Model4.{Album, Tracks}
+
+songs = [
+  "School",
+  "Bloody Well Right",
+  "Hide in Your Shell",
+  "Asylum",
+  "Dreamer",
+  "Rudy",
+  "If Everyone Was Listening",
+  "Crime of the Century"
+]
+
+for {i, t} <- Enum.zip(1..length(songs), songs) do
+  %{index: i, title: t}
+end
+
+Repo.get_by(Album, title: "Crisis? What Crisis?")
+```
+
 ## WIP
 
-* Añadir una entrada en una colección
-* Modificar una entrada de colección
-* Modificar una colección por completo
+* Asociaciones N:N
+* Añadir todas las *restricciones* y *validaciones* que faltan (ej. en `Track` `album_id` e `index` son *unique*)
 
 ## ...Famous Last Words...
 
