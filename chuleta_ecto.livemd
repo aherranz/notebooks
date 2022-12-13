@@ -10,6 +10,8 @@ Mix.install([
 ])
 ```
 
+## ANTES DE NADA: mix do ecto.drop, ecto.create
+
 ## Antes de empezar
 
 * He intentado hacerlo **todo desde livebook** y **casi** lo consigo 😜
@@ -58,7 +60,7 @@ graph TD;
 
 ## Preparando la base de datos y el repositorio
 
-* Vamos a trabajar con una base de datos PostgreSQL de verdad asi que necesitamos usuario y password
+* Vamos a trabajar con una **base de datos PostgreSQL de verdad** asi que necesitamos usuario y password
 
 ```sh
 sudo -u postgres psql -c "create role chuleta login password 'chuleta' createdb;"
@@ -119,34 +121,34 @@ Repo.config()
 * Vamos a usar el mismo ejemplo del libro **Programming Ecto** de *Darin Wilson Eric Meadows-Jönsson*
 * Base de datos de **álbumes musicales**: artistas, álbumes, géneros, pistas
   ```mermaid
-                              classDiagram
-                              class Album {
-                                id: integer [PK]
-                                title: string [1]
-                                released: date
-                              }
-                              class Artist {
-                                id: integer [PK]
-                                name: string [1] [unique]
-                              }
-                              class Genre {
-                                id: integer [PK]
-                                name: string [1] [unique]
-                              }
-                              class Track {
-                                id: integer [PK]
-                                title: string [1]
-                                duration: integer
-                              }
-                              Album "*" -- "1" Artist
-                              Album "*" -- "1..*" Genre
-                              Album "1" -- "1..* {ordered}" Track
+                                  classDiagram
+                                  class Album {
+                                    id: integer [PK]
+                                    title: string [1]
+                                    released: date
+                                  }
+                                  class Artist {
+                                    id: integer [PK]
+                                    name: string [1] [unique]
+                                  }
+                                  class Genre {
+                                    id: integer [PK]
+                                    name: string [1] [unique]
+                                  }
+                                  class Track {
+                                    id: integer [PK]
+                                    title: string [1]
+                                    duration: integer
+                                  }
+                                  Album "*" -- "1" Artist
+                                  Album "*" -- "1..*" Genre
+                                  Album "1" -- "1..* {ordered}" Track
   ```
-* Seguro que el modelo es debatible dependiendo de lo que uno quiera entender, nos ceñimos a la semántica del diagrama, que a mi tampoco me gusta 😀
+* Seguro que el modelo es debatible dependiendo de lo que uno quiera entender, nos ceñimos a la semántica del diagrama, que **a mi tampoco me gusta 😀**
 
 ## Un primer modelo
 
-* Creamos un *schema* por cada entidad del modelo, empezamos con `Artist`
+* Creamos **un *schema* por cada entidad** del modelo, empezamos con `Artist`
 
 ```elixir
 defmodule Chuleta.Model1.Artist do
@@ -165,7 +167,7 @@ end
 alias Chuleta.Model1.Artist
 ```
 
-* Exploremos el aspecto de los datos (*struct* `Artist`)
+* Exploremos el ***aspecto* de los datos** (*struct* `Artist`)
 
 ```elixir
 %Artist{}
@@ -178,14 +180,14 @@ alias Chuleta.Model1.Artist
 
 <!-- livebook:{"break_markdown":true} -->
 
-* Ya tenemos un *schema* y un *repo* ¿quizás podamos ya añadir datos?
-* Podemos intentar el [*Schema API*](https://hexdocs.pm/ecto/Ecto.Repo.html#schema-api) de `Repo`, en concreto `insert`
+* Ya tenemos un *schema* y un *repo* ¿quizás podamos ya **añadir datos**?
+* Podemos intentar el [*Schema API*](https://hexdocs.pm/ecto/Ecto.Repo.html#schema-api) de `Repo`, en concreto `Repo.insert`
 
 ```elixir
 Repo.insert(%Artist{})
 ```
 
-* *Obviamente* necesitábamos la tabla asociada
+* *Obviamente* **necesitábamos la tabla asociada**
 * La creación de una tabla se **define** en una *migración* como esta:
 
 ```elixir
@@ -202,7 +204,7 @@ defmodule Chuleta.Repo.Migrations.CreateArtistsTable do
 end
 ```
 
-* Y se ejecuta con `Ecto.Migrator` (por suerte se dispone de mucha ayuda de `mix` aunque aquí no lo vamos a usar)
+* Y se ejecuta con `Ecto.Migrator` (por suerte se dispone de mucha ayuda de `mix ecto.migrate` aunque aquí no lo vamos a usar)
 
 ```elixir
 Ecto.Migrator.run(Repo, [{0, Chuleta.Repo.Migrations.CreateArtistsTable}], :up, all: true)
@@ -225,13 +227,13 @@ Repo.all(Artist)
 * El modelo conceptual dice que la multiplicidad de `name` es [1]
 * La migración puede incluir restricciones sobre el modelo lógico como `NOT NULL`:
   ```elixir
-            def change do
-              create table("artists") do
-                add(:name, :string, null: false)
+                def change do
+                  create table("artists") do
+                    add(:name, :string, null: false)
 
-                timestamps()
-              end
-            end
+                    timestamps()
+                  end
+                end
   ```
 * Vamos a hacerlo con una nueva migración
 
@@ -250,6 +252,8 @@ end
 ```elixir
 Ecto.Migrator.run(Repo, [{1, Chuleta.Repo.Migrations.NameNotNull}], :up, all: true)
 ```
+
+* Se puede hacer un ***rollback* automáticamente**
 
 ```elixir
 Ecto.Migrator.run(Repo, [{0, Chuleta.Repo.Migrations.CreateArtistsTable}], :down, all: true)
@@ -275,10 +279,10 @@ Repo.insert(%Artist{})
 * Proteger el modelo lógico es estupendo pero **no queremos** tener que manejar **excepciones**
 * El concepto de *changeset* nos va a ayudar con ese control de errores
   ```mermaid
-          graph TD;
-            Data[Data / Schema] -->|Changeset.change| Changeset;
-            Changeset -->|Changeset.cast, validate| Changeset;
-            Changeset -->|Repo.insert, update| Schema;
+              graph TD;
+                Data[Data / Schema] -->|Changeset.change| Changeset;
+                Changeset -->|Changeset.cast, validate| Changeset;
+                Changeset -->|Repo.insert, update| Schema;
   ```
 
 ```elixir
@@ -286,20 +290,19 @@ alias Ecto.Changeset
 ```
 
 ```elixir
-result =
-  %Artist{}
-  |> Changeset.change()
-  |> Changeset.validate_required([:name])
-  |> Repo.insert()
-  |> dbg()
+%Artist{}
+|> Changeset.change()
+|> Changeset.validate_required([:name])
+|> Repo.insert()
+|> dbg()
 ```
 
-* Se puede intuir lo **esencial** que resulta el *changeset* en Ecto, todo gira alrededor de este importante concepto, todos **los módulos tienen funciones que admiten o generan *changesets***
+* ✅ Se puede intuir lo **esencial** que resulta el *changeset* en Ecto, todo gira alrededor de este importante concepto, todos **los módulos tienen funciones que admiten o generan *changesets***
 
 ## Patrón: funciones que generan changesets
 
 * Cada *schema* lleva su propia función para generar *changesets*: `changeset`
-* Dicha función abstrae las validaciones y adaptaciones (*cast*)
+* Dicha función abstrae las validaciones y adaptaciones (*cast*) de datos externos
 
 ```elixir
 defmodule Chuleta.Model2.Artist do
@@ -318,6 +321,8 @@ defmodule Chuleta.Model2.Artist do
     data
     |> Changeset.cast(params, [:name])
     |> Changeset.validate_required([:name])
+    |> Changeset.unique_constraint(:id, name: "artists_pkey")
+    |> Changeset.unique_constraint(:name)
   end
 end
 ```
@@ -358,7 +363,7 @@ a1
 Repo.all(Artist)
 ```
 
-* El modelo conceptual nos dice que `name` es `unique`
+* El modelo conceptual nos dice que `name` es [unique]
 * Vamos a trasladarlo al modelo lógico
 
 ```elixir
@@ -402,30 +407,30 @@ Repo.insert(%Artist{name: "Pink Floyd"})
 * Ecto, como otras bibliotecas, ofrece una forma de capturar las asociaciones del modelo y sus multiplicidades
 * Recordemos el modelo:
   ```mermaid
-  classDiagram
-                              class Album {
-                                id: integer [PK]
-                                title: string [1]
-                                released: date
-                              }
-                              class Artist {
-                                id: integer [PK]
-                                name: string [1] [unique]
-                              }
-                              class Genre {
-                                id: integer [PK]
-                                name: string [1] [unique]
-                              }
-                              class Track {
-                                id: integer [PK]
-                                title: string [1]
-                                duration: integer
-                              }
-                              Album "*" -- "1" Artist
-                              Album "*" -- "1..*" Genre
-                              Album "1" -- "1..* {ordered}" Track
+      classDiagram
+                                  class Album {
+                                    id: integer [PK]
+                                    title: string [1]
+                                    released: date
+                                  }
+                                  class Artist {
+                                    id: integer [PK]
+                                    name: string [1] [unique]
+                                  }
+                                  class Genre {
+                                    id: integer [PK]
+                                    name: string [1] [unique]
+                                  }
+                                  class Track {
+                                    id: integer [PK]
+                                    title: string [1]
+                                    duration: integer
+                                  }
+                                  Album "*" -- "1" Artist
+                                  Album "*" -- "1..*" Genre
+                                  Album "1" -- "1..* {ordered}" Track
   ```
-* Nos llevamos el modelo a *schemas* incluyendo ahora `Artist`, `Album` y su asociación $N:1$
+* Nos llevamos el modelo a *schemas* incluyendo ahora `Artist`, `Album` y su asociación $N:1$ (**atención a `typed_schema` y al spec de changeset**)
 
 ```elixir
 defmodule Chuleta.Model3.Artist do
@@ -492,7 +497,7 @@ alias Chuleta.Model3.{Artist, Album}
 
 <!-- livebook:{"break_markdown":true} -->
 
-* Vamos con la migración para crear la nueva tabla
+* Vamos con la migración para crear la **nueva tabla**
 
 ```elixir
 defmodule Chuleta.Repo.Migrations.CreateAlbumsTable do
@@ -514,7 +519,7 @@ end
 Ecto.Migrator.run(Repo, [{4, Chuleta.Repo.Migrations.CreateAlbumsTable}], :up, all: true)
 ```
 
-* Vamos a poblar un poquito nuestra base de datos con datos razonables, que no con gusto 😜
+* Vamos a **poblar** un poquito nuestra base de datos con datos razonables, que no con gusto 😜
 
 ```elixir
 Repo.delete_all(Artist)
@@ -537,13 +542,17 @@ tangana = Repo.get_by(Artist, name: "C. Tangana")
 * `Ecto.build_assoc` genera un nuevo *schema* (**no lo hace persistente**)
 
 ```elixir
+tangana
+```
+
+```elixir
 tangana |> Ecto.build_assoc(:albums)
 ```
 
-* Vamos a crear un par de álbumes
+* Vamos a crear un par de álbumes usando **dos alternativas habituales**
 
 ```elixir
-tangana |> Ecto.build_assoc(:albums, title: "Idolo", released: "2017-10-06") |> Repo.insert()
+tangana |> Ecto.build_assoc(:albums, title: "Idolo", released: "2017") |> Repo.insert()
 ```
 
 * ¡Eso era un antipatrón! (la fecha parece ser un dato externo sobre el que no se tiene control)
@@ -561,8 +570,8 @@ tangana
 tangana = Repo.get_by(Artist, name: "C. Tangana")
 ```
 
-* ¿Para qué está ese campo `albums` y qué significa *not loaded*?
-* Por defecto las asociaciones no se *precargan*: **eficiencia**
+* ¿Para qué está ese campo `albums` y **qué significa *not loaded***?
+* Por defecto las asociaciones **no se *precargan***: **eficiencia**
 
 ```elixir
 tangana |> Repo.preload(:albums)
@@ -572,22 +581,27 @@ tangana |> Repo.preload(:albums)
 tangana.albums
 ```
 
+* ¿Qué ha pasado, programador OO?
+
 ## Antipatrón: preload => 1 + X queries
 
 ```elixir
 Repo.get_by(Artist, name: "C. Tangana") |> Repo.preload(:albums)
 ```
 
-
-
-## Poblado
+## Poblado con más gusto 😜
 
 ```elixir
+# Por si acaso está en la base de datos
 supertramp = Repo.get_by!(Artist, name: "Supertramp")
 ```
 
 ```elixir
 {:ok, supertramp} = %Artist{} |> Artist.changeset(%{name: "Supertramp"}) |> Repo.insert()
+```
+
+```elixir
+supertramp
 ```
 
 ```elixir
@@ -600,14 +614,14 @@ supertramp |> Ecto.build_assoc(:albums, title: "Crisis? What Crisis?") |> Repo.i
 
 ## Queries
 
-* Hasta ahora nuestras queries han sido nimias (`Repo.get_by`)
-* En el [*query API de Repo*](https://hexdocs.pm/ecto/Ecto.Repo.html#query-api) se pueden encontrar operaciones más potentes
+* Hasta ahora nuestras queries han sido ***nimias*** (`Repo.get_by`)
+* En el [*query API de Repo*](https://hexdocs.pm/ecto/Ecto.Repo.html#query-api) se pueden encontrar operaciones **más potentes**
 
 ```elixir
 Repo.all(Artist)
 ```
 
-* ¿Y si queremos hacer una *precarga* de todos los álbumes?
+* ¿Y si queremos hacer una ***precarga* de todos los álbumes de todos los artistas**?
 
 ```elixir
 for artist <- Repo.all(Artist) do
@@ -615,7 +629,7 @@ for artist <- Repo.all(Artist) do
 end
 ```
 
-* Ese antipatrón ya lo conocemos: 1+N queries
+* Ese antipatrón ya lo conocemos: *1+N queries*
 * ¿Pero qué opciones tenemos?
 
 ```elixir
@@ -643,11 +657,11 @@ Repo.all(
 )
 ```
 
-## Manejando la colección como un todo
+## Manejando la colección como un todo (WIP ⚠)
 
-* Ya hemos visto que el uso de `Ecto.build_assoc` permite crear una entrada en un colección
-* ¿Pero qué pasa si necesitamos manejar la colección como un topo?
-* Ampliemos nuestro modelo con las canciones en los álbumes
+* Ya hemos visto que el uso de `Ecto.build_assoc` permite crear **una entrada en una colección**
+* ¿Pero qué pasa si necesitamos manejar **la colección como un todo**?
+* Ampliemos nuestro modelo con las **canciones en los álbumes**
 
 ```elixir
 defmodule Chuleta.Model4.Track do
@@ -667,7 +681,7 @@ defmodule Chuleta.Model4.Track do
   def changeset(data, params) do
     data
     |> Changeset.cast(params, [:title, :index])
-    |> Changeset.validate_required([:title, :index, :album_id])
+    |> Changeset.validate_required([:title, :index])
     |> Changeset.unique_constraint(:id, name: "tracks_pkey")
   end
 end
@@ -679,7 +693,8 @@ end
 defmodule Chuleta.Model4.Album do
   use TypedEctoSchema
   alias Ecto.Changeset
-  alias Chuleta.Model3.{Artist, Track}
+  alias Chuleta.Model3.Artist
+  alias Chuleta.Model4.Track
 
   typed_schema "albums" do
     field(:title, :string)
@@ -723,7 +738,9 @@ Ecto.Migrator.run(Repo, [{5, Chuleta.Repo.Migrations.CreateTracksTable}], :up, a
 
 ```elixir
 alias Chuleta.Model4.{Album, Tracks}
+```
 
+```elixir
 songs = [
   "School",
   "Bloody Well Right",
@@ -735,11 +752,22 @@ songs = [
   "Crime of the Century"
 ]
 
-for {i, t} <- Enum.zip(1..length(songs), songs) do
-  %{index: i, title: t}
-end
+tracks =
+  for {i, t} <- Enum.zip(1..length(songs), songs) do
+    %{index: i, title: t}
+  end
 
-Repo.get_by(Album, title: "Crisis? What Crisis?")
+album =
+  Repo.one(
+    from(al in Album,
+      where: al.title == "Crisis? What Crisis?",
+      left_join: ar in assoc(al, :artist),
+      left_join: tr in assoc(al, :tracks),
+      preload: [artist: ar, tracks: tr]
+    )
+  )
+
+album |> Album.changeset(%{tracks: tracks}) |> Changeset.cast_assoc(:tracks) |> Repo.update()
 ```
 
 ## WIP
@@ -749,13 +777,33 @@ Repo.get_by(Album, title: "Crisis? What Crisis?")
 
 ## ...Famous Last Words...
 
-* Entender el mapping a diferentes niveles (tipos ,etc)
-* Clave binaria vs entera
-* En las migraciones se pueden codificar todas las restricciones habituales en SQL
-* Asociaciones transitivas
-* Asociaciones "polimórficas"
+* Cuidado con `Changeset.validate_required` para claves foráneas pq entonces no funcionan `Changeset.put_assoc` ni `Changeset.cast_assoc`
+
+* Entender el **mapping** y los diferentes tipos (incluye listas, maps, enumerados)
+
+* Clave **binaria** vs entera
+
+  ```elixir
+      @primary_key {:id, :binary_id, autogenerate: true}
+      @foreign_key_type :binary_id
+      schema "artists" ...
+  ```
+
+  > y
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+    create table("artists", primary_key: false) do
+      add :id, :binary_id, primary_key: true
+      ...
+```
+
+* En las migraciones se pueden codificar **todas las restricciones en SQL**
+* Asociaciones **transitivas** (ej. todas las canciones de un grupo)
+* Asociaciones *polimórficas* (ej. urso con videos y preguntas)
 * *Custom types*
 * *Upserts*
 * *Transactions*
-* Infinidad de detalles que de un modo u otro tienen que ver con el modelo relacional (ej. `on_conflict`)
-* Mi experiencia con este notebook (vs. slides)
+* Infinidad de detalles que de un modo u otro tienen que ver con el **modelo relacional** (ej. `on_conflict`)
+* Mi experiencia con este notebook (vs. slides): **aún no lo tengo claro**
