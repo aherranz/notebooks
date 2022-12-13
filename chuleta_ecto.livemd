@@ -12,16 +12,17 @@ Mix.install([
 
 ## Antes de empezar
 
-* He intentado hacerlo **todo** desde livebook y **casi** lo consigo 😜
-* El notebook incluye un pequeño proyecto `chuleta` con una aplicación OTP y un repositorio Ecto
-* Justo eso es lo que no he logrado hacer desde este notebook
+* He intentado hacerlo **todo desde livebook** y **casi** lo consigo 😜
+* El *repo git* incluye un **pequeño proyecto** `chuleta` con una aplicación OTP y un repositorio Ecto (justo eso es lo que no he logrado hacer desde este *notebook*)
+* Me habría gustado preparar más contenido pero entre lo que me he liado aprendiendo a usar *livebook* y un pequeño proceso gripal...
+* Aunque un poco caótico, creo valdrá para aprender y **debatir** juntos
 
 ## Objetivos
 
 * **Compartir** con vosotros esta **espectacular biblioteca**
 * Ofrecer una presentación **rápida y didáctica (espero)** a los principales conceptos
 * Ofrecer algunos **patrones de código** que creo que pueden resultar muy últiles
-* Aparecer indexado en [notes.club](https://notes.club) 🤩
+* Aparecer indexado por primera vez en [notes.club](https://notes.club) 🤩 (disponible en https://github.com/aherranz/notebooks)
 
 ## ¿Qué es Ecto?
 
@@ -121,16 +122,19 @@ Repo.config()
                               classDiagram
                               class Album {
                                 id: integer [PK]
-                                name: title [1]
+                                title: string [1]
                                 released: date
                               }
                               class Artist {
+                                id: integer [PK]
                                 name: string [1] [unique]
                               }
                               class Genre {
+                                id: integer [PK]
                                 name: string [1] [unique]
                               }
                               class Track {
+                                id: integer [PK]
                                 title: string [1]
                                 duration: integer
                               }
@@ -244,16 +248,20 @@ end
 ```
 
 ```elixir
+Ecto.Migrator.run(Repo, [{1, Chuleta.Repo.Migrations.NameNotNull}], :up, all: true)
+```
+
+```elixir
+Ecto.Migrator.run(Repo, [{0, Chuleta.Repo.Migrations.CreateArtistsTable}], :down, all: true)
+```
+
+```elixir
 Ecto.Migrator.run(
   Repo,
   [{0, Chuleta.Repo.Migrations.CreateArtistsTable}, {1, Chuleta.Repo.Migrations.NameNotNull}],
   :up,
   all: true
 )
-```
-
-```elixir
-Ecto.Migrator.run(Repo, [{0, Chuleta.Repo.Migrations.CreateArtistsTable}], :down, all: true)
 ```
 
 * Reintentamos la inserción esperando un error de algún tipo
@@ -377,12 +385,203 @@ Ecto.Migrator.run(Repo, [{3, Chuleta.Repo.Migrations.AddUniqueIndexName}], :up, 
 
 * Comprobamos ahora el resultado al intentar añadir dos artistas con el mismo nombre
 
-## Asociaciones
+## Antipatrón: no usar changesets
 
-*
+```elixir
+a = Repo.get_by(Artist, name: "Supertramp")
+Repo.update(%Artist{a | name: "Supertramp. The group"})
+```
 
-## Last Famous Words
+```elixir
+Repo.insert(%Artist{name: "Pink Floyd"})
+```
+
+## Asociaciones N:1
+
+* Lo realmente importante en nuestros modelos son las asociaciones porque [las entidades son un *placebo*](https://babel.upm.es/~angel/posts/2022/03/uml-las-clases-son-un-placebo/) 🤪
+* Ecto, como otras bibliotecas, ofrece una forma de capturar las asociaciones del modelo y sus multiplicidades
+* Recordemos el modelo:
+  ```mermaid
+  classDiagram
+                              class Album {
+                                id: integer [PK]
+                                title: string [1]
+                                released: date
+                              }
+                              class Artist {
+                                id: integer [PK]
+                                name: string [1] [unique]
+                              }
+                              class Genre {
+                                id: integer [PK]
+                                name: string [1] [unique]
+                              }
+                              class Track {
+                                id: integer [PK]
+                                title: string [1]
+                                duration: integer
+                              }
+                              Album "*" -- "1" Artist
+                              Album "*" -- "1..*" Genre
+                              Album "1" -- "1..* {ordered}" Track
+  ```
+* Nos llevamos el modelo a *schemas* incluyendo ahora `Artist`, `Album` y su asociación $N:1$
+
+```elixir
+defmodule Chuleta.Model3.Artist do
+  use TypedEctoSchema
+  alias Ecto.Changeset
+  alias Chuleta.Model3.Album
+
+  typed_schema "artists" do
+    field(:name, :string)
+    has_many(:albums, Album)
+
+    timestamps()
+  end
+
+  @spec changeset(t() | Changeset.t(t()), map()) :: Changeset.t(t())
+  def changeset(data, params) do
+    data
+    |> Changeset.cast(params, [:name])
+    |> Changeset.validate_required([:name])
+    |> Changeset.unique_constraint(:id, name: "artists_pkey")
+    |> Changeset.unique_constraint(:name)
+  end
+end
+```
+
+```elixir
+defmodule Chuleta.Model3.Album do
+  use TypedEctoSchema
+  alias Ecto.Changeset
+  alias Chuleta.Model3.Artist
+
+  typed_schema "albums" do
+    field(:title, :string)
+    field(:released, :date)
+    belongs_to(:artist, Artist)
+
+    timestamps()
+  end
+
+  def changeset(data, params) do
+    data
+    |> Changeset.cast(params, [:title, :released])
+    |> Changeset.validate_required([:title, :artist_id])
+    |> Changeset.unique_constraint(:id, name: "albums_pkey")
+  end
+end
+```
+
+* ¿Qué aspecto tienen ahora nuestros *datos*?
+
+```elixir
+alias Chuleta.Model3.{Artist, Album}
+```
+
+```elixir
+%Artist{}
+```
+
+```elixir
+%Album{}
+```
+
+* **Observar:** como era de esperar, **`belongs_to` introduce una clave *foránea*** (`artist_id`) en el modelo lógico pero `has_many` no va a introducir nada
+
+<!-- livebook:{"break_markdown":true} -->
+
+* Vamos con la migración para crear la nueva tabla
+
+```elixir
+defmodule Chuleta.Repo.Migrations.CreateAlbumsTable do
+  use Ecto.Migration
+
+  def change do
+    create table("albums") do
+      add(:title, :string, null: false)
+      add(:released, :date)
+      add(:artist_id, references("artists"), null: false)
+
+      timestamps()
+    end
+  end
+end
+```
+
+```elixir
+Ecto.Migrator.run(Repo, [{4, Chuleta.Repo.Migrations.CreateAlbumsTable}], :up, all: true)
+```
+
+* Vamos a poblar un poquito nuestra base de datos con datos razonables, que no con gusto 😜
+
+```elixir
+Repo.delete_all(Artist)
+```
+
+```elixir
+%Artist{} |> Artist.changeset(%{name: "C. Tangana"}) |> Repo.insert()
+```
+
+```elixir
+tangana = Repo.get_by(Artist, name: "C. Tangana")
+```
+
+```elixir
+%Album{} |> Album.changeset(%{title: "El Madrileño", released: "2021-02-26"})
+```
+
+## Patrón: crear y añadir a una "colección"
+
+```elixir
+tangana |> Ecto.build_assoc(:albums)
+```
+
+## Preload
+
+```elixir
+tangana
+```
+
+* ¿Para qué está ese campo `albums` y qué significa *not loaded*?
+* Es una importante cuestión de eficiencia: por defecto las asociaciones no se *precargan*
+
+```elixir
+tangana |> Repo.preload(:albums)
+```
+
+```elixir
+supertramp = Repo.get_by!(Artist, name: "Supertramp")
+```
+
+```elixir
+{:ok, supertramp} = %Artist{} |> Artist.changeset(%{name: "Supertramp"}) |> Repo.insert()
+```
+
+```elixir
+supertramp |> Ecto.build_assoc(:albums, title: "Crime of the century")
+```
+
+```elixir
+supertramp |> Ecto.build_assoc(:albums, title: "Crisis? What Crisis?")
+```
+
+
+
+```elixir
+supertramp |> Ecto.build_assoc(:al)
+```
+
+## ...Famous Last Words...
 
 * Entender el mapping a diferentes niveles (tipos ,etc)
 * Clave binaria vs entera
 * En las migraciones se pueden codificar todas las restricciones habituales en SQL
+* Mi experiencia con este notebook (vs. slides)
+* Asociaciones transitivas
+* Asociaciones "polimórficas"
+* *Custom types*
+* *Upserts*
+* *Transactions*
+* Infinidad de detalles que de un modo u otro tienen que ver con el modelo relacional (ej. `on_conflict`)
