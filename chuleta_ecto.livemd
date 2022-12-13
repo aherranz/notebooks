@@ -1,0 +1,388 @@
+# Una chuleta para manejarte en Ecto ▷ Madrid ▷ Elixir
+
+```elixir
+Mix.install([
+  # Disponible con el mismo git en el que está este notebook
+  {:chuleta, path: "#{__DIR__}/chuleta"},
+
+  # Me gustan los tipos, aunque sólo sea para documentar
+  {:typed_ecto_schema, "~> 0.4.0"}
+])
+```
+
+## Antes de empezar
+
+* He intentado hacerlo **todo** desde livebook y **casi** lo consigo 😜
+* El notebook incluye un pequeño proyecto `chuleta` con una aplicación OTP y un repositorio Ecto
+* Justo eso es lo que no he logrado hacer desde este notebook
+
+## Objetivos
+
+* **Compartir** con vosotros esta **espectacular biblioteca**
+* Ofrecer una presentación **rápida y didáctica (espero)** a los principales conceptos
+* Ofrecer algunos **patrones de código** que creo que pueden resultar muy últiles
+* Aparecer indexado en [notes.club](https://notes.club) 🤩
+
+## ¿Qué es Ecto?
+
+* **Biblioteca** de Elixir
+* **Equivalente a un ORM** en OO (*object-relational mapping*)
+* ¡Pero **nada de objetos**!
+* Expone al programador al **modelo relacional** 👍
+* Uso intenso de la metaprogramación: **DSL para las *queries*** (DSL = *domain specific language*)
+* No se escribe código SQL 🤥
+
+## Conceptos
+
+* **Schema:** estructura de datos para el ***mapping* entre una tabla SQL y un *struct* en Elixir** (con confundir con el esquema relacional)
+* **Changeset:** 👑 estructura de datos para **acumular cambios y validarlos**.
+* **Queries:** estructura de datos para **codificar *queries*** a la base de datos.
+* **Repo:** módulo con **operaciones** sobre la base de datos (*insert, update, delete, all, get, one, transactions*)
+* **Migration:** módulo con **operaciones para modificar el esquema** de la base de datos (*create table, alter column, etc.*), incluyendo ***rollbacks* automáticos**
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- Learn more at https://mermaid-js.github.io/mermaid -->
+
+```mermaid
+graph TD;
+  Schema -->|cambios y validaciones| Changeset;
+  Datos[Datos Externos] --->|validaciones| Changeset;
+  Changeset -->|cambios y validaciones| Changeset;
+  Changeset -->|schema API: insert, update| Repo;
+  Queries -->|query API: all, get, delete| Repo;
+  Repo -->|resultado| Schema;
+  Repo <--> Database[(Database)]
+```
+
+## Preparando la base de datos y el repositorio
+
+* Vamos a trabajar con una base de datos PostgreSQL de verdad asi que necesitamos usuario y password
+
+```sh
+sudo -u postgres psql -c "create role chuleta login password 'chuleta' createdb;"
+sudo -u postgres psql -c "create database chuleta owner chuleta;"
+```
+
+* Creamos un **repo** para conectarlo a la base de datos, ver `chuleta/lib/chuleta/repo.ex`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule Chuleta.Repo do
+  use Ecto.Repo,
+    otp_app: :chuleta,
+    adapter: Ecto.Adapters.Postgres
+
+  def init(_context, config) do
+    {:ok, Keyword.put(config, :url, "ecto://chuleta:chuleta@localhost/chuleta")}
+  end
+end
+```
+
+* Y configuraciones en `chuleta/config/config.exs`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+import Config
+config :chuleta, ecto_repos: [Chuleta.Repo]
+```
+
+* Es necesario crear la base de datos con:
+
+```sh
+mix ecto.create
+```
+
+## Comprobaciones previas
+
+* La aplicación OTP `:chuleta` está en marcha
+
+```elixir
+hd(Application.started_applications())
+```
+
+* El *repositorio* está configurado
+
+```elixir
+alias Chuleta.Repo
+```
+
+```elixir
+Repo.config()
+```
+
+## Ejemplo: modelo conceptual
+
+* Vamos a usar el mismo ejemplo del libro **Programming Ecto** de *Darin Wilson Eric Meadows-Jönsson*
+* Base de datos de **álbumes musicales**: artistas, álbumes, géneros, pistas
+  ```mermaid
+                              classDiagram
+                              class Album {
+                                id: integer [PK]
+                                name: title [1]
+                                released: date
+                              }
+                              class Artist {
+                                name: string [1] [unique]
+                              }
+                              class Genre {
+                                name: string [1] [unique]
+                              }
+                              class Track {
+                                title: string [1]
+                                duration: integer
+                              }
+                              Album "*" -- "1" Artist
+                              Album "*" -- "1..*" Genre
+                              Album "1" -- "1..* {ordered}" Track
+  ```
+* Seguro que el modelo es debatible dependiendo de lo que uno quiera entender, nos ceñimos a la semántica del diagrama, que a mi tampoco me gusta 😀
+
+## Un primer modelo
+
+* Creamos un *schema* por cada entidad del modelo, empezamos con `Artist`
+
+```elixir
+defmodule Chuleta.Model1.Artist do
+  use Ecto.Schema
+
+  schema "artists" do
+    field(:name, :string)
+
+    # Regalo: macro para manejar automáticamente fechas de inserción y borrado
+    timestamps()
+  end
+end
+```
+
+```elixir
+alias Chuleta.Model1.Artist
+```
+
+* Exploremos el aspecto de los datos (*struct* `Artist`)
+
+```elixir
+%Artist{}
+```
+
+* Seguro que ya nos asaltan algunas dudas:
+  * ¿De dónde sale `id`? ¿[De qué tipo](https://hexdocs.pm/ecto/Ecto.Schema.html#module-primary-keys) es?
+  * ¿[De qué tipo](https://hexdocs.pm/elixir/NaiveDateTime.html) son `inserted_at` y `updated_at`?
+  * ¿[Qué tipos](https://hexdocs.pm/ecto/Ecto.Schema.html#module-types-and-casting) puedo usar para describir los campos?
+
+<!-- livebook:{"break_markdown":true} -->
+
+* Ya tenemos un *schema* y un *repo* ¿quizás podamos ya añadir datos?
+* Podemos intentar el [*Schema API*](https://hexdocs.pm/ecto/Ecto.Repo.html#schema-api) de `Repo`, en concreto `insert`
+
+```elixir
+Repo.insert(%Artist{})
+```
+
+* *Obviamente* necesitábamos la tabla asociada
+* La creación de una tabla se **define** en una *migración* como esta:
+
+```elixir
+defmodule Chuleta.Repo.Migrations.CreateArtistsTable do
+  use Ecto.Migration
+
+  def change do
+    create table("artists") do
+      add(:name, :string)
+
+      timestamps()
+    end
+  end
+end
+```
+
+* Y se ejecuta con `Ecto.Migrator` (por suerte se dispone de mucha ayuda de `mix` aunque aquí no lo vamos a usar)
+
+```elixir
+Ecto.Migrator.run(Repo, [{0, Chuleta.Repo.Migrations.CreateArtistsTable}], :up, all: true)
+```
+
+* Volvemos a intentar ahora la inserción, varias veces
+
+```elixir
+Repo.insert(%Artist{})
+```
+
+* E inmediatamente la extracción
+
+```elixir
+Repo.all(Artist)
+```
+
+## Protegemos el modelo lógico
+
+* El modelo conceptual dice que la multiplicidad de `name` es [1]
+* La migración puede incluir restricciones sobre el modelo lógico como `NOT NULL`:
+  ```elixir
+            def change do
+              create table("artists") do
+                add(:name, :string, null: false)
+
+                timestamps()
+              end
+            end
+  ```
+* Vamos a hacerlo con una nueva migración
+
+```elixir
+defmodule Chuleta.Repo.Migrations.NameNotNull do
+  use Ecto.Migration
+
+  def change do
+    alter table("artists") do
+      modify(:name, :string, null: false)
+    end
+  end
+end
+```
+
+```elixir
+Ecto.Migrator.run(
+  Repo,
+  [{0, Chuleta.Repo.Migrations.CreateArtistsTable}, {1, Chuleta.Repo.Migrations.NameNotNull}],
+  :up,
+  all: true
+)
+```
+
+```elixir
+Ecto.Migrator.run(Repo, [{0, Chuleta.Repo.Migrations.CreateArtistsTable}], :down, all: true)
+```
+
+* Reintentamos la inserción esperando un error de algún tipo
+
+```elixir
+Repo.insert(%Artist{})
+```
+
+## Buscando errores más orgánicos
+
+* Proteger el modelo lógico es estupendo pero **no queremos** tener que manejar **excepciones**
+* El concepto de *changeset* nos va a ayudar con ese control de errores
+  ```mermaid
+          graph TD;
+            Data[Data / Schema] -->|Changeset.change| Changeset;
+            Changeset -->|Changeset.cast, validate| Changeset;
+            Changeset -->|Repo.insert, update| Schema;
+  ```
+
+```elixir
+alias Ecto.Changeset
+```
+
+```elixir
+result =
+  %Artist{}
+  |> Changeset.change()
+  |> Changeset.validate_required([:name])
+  |> Repo.insert()
+  |> dbg()
+```
+
+* Se puede intuir lo **esencial** que resulta el *changeset* en Ecto, todo gira alrededor de este importante concepto, todos **los módulos tienen funciones que admiten o generan *changesets***
+
+## Patrón: funciones que generan changesets
+
+* Cada *schema* lleva su propia función para generar *changesets*: `changeset`
+* Dicha función abstrae las validaciones y adaptaciones (*cast*)
+
+```elixir
+defmodule Chuleta.Model2.Artist do
+  use TypedEctoSchema
+  alias Ecto.Changeset
+
+  typed_schema "artists" do
+    field(:name, :string)
+
+    # Regalo: macro para manejar automáticamente fechas de inserción y borrado
+    timestamps()
+  end
+
+  @spec changeset(t() | Changeset.t(t()), map()) :: Changeset.t(t())
+  def changeset(data, params) do
+    data
+    |> Changeset.cast(params, [:name])
+    |> Changeset.validate_required([:name])
+  end
+end
+```
+
+```elixir
+alias Chuleta.Model2.Artist
+```
+
+* Insertamos un primer artista
+
+```elixir
+{:ok, a1} =
+  %Artist{}
+  |> Artist.changeset(%{name: "Supertrump"})
+  |> Repo.insert()
+```
+
+* Intentamos corregir el error: Supertrump -> Supertramp
+
+```elixir
+a1
+|> Artist.changeset(%{name: "Supertramp"})
+|> Repo.insert()
+```
+
+* Una consulta rápida al [*Schema API* de Repo](https://hexdocs.pm/ecto/Ecto.Repo.html#schema-api) nos indica que debemos usar `update`
+* Pero además deberíamos volver al *schema* y mejorar la función `changeset` como nos indica el mensaje de error (para más información conviene bucear en el [API de Changeset](https://hexdocs.pm/ecto/Ecto.Changeset.html))
+
+## Patrón: proteger el modelo lógico y los esquemas
+
+* Parece que podemos añadir varias veces el mismo nombre de artista
+
+```elixir
+%Artist{} |> Artist.changeset(%{name: "Supertramp"}) |> Repo.insert()
+```
+
+```elixir
+Repo.all(Artist)
+```
+
+* El modelo conceptual nos dice que `name` es `unique`
+* Vamos a trasladarlo al modelo lógico
+
+```elixir
+defmodule Chuleta.Repo.Migrations.AddUniqueIndexName do
+  use Ecto.Migration
+
+  def change do
+    create(unique_index("artists", :name))
+  end
+end
+```
+
+```elixir
+Ecto.Migrator.run(Repo, [{3, Chuleta.Repo.Migrations.AddUniqueIndexName}], :up, all: true)
+```
+
+```elixir
+Repo.delete_all(Artist)
+```
+
+```elixir
+Ecto.Migrator.run(Repo, [{3, Chuleta.Repo.Migrations.AddUniqueIndexName}], :up, all: true)
+```
+
+* Comprobamos ahora el resultado al intentar añadir dos artistas con el mismo nombre
+
+## Asociaciones
+
+*
+
+## Last Famous Words
+
+* Entender el mapping a diferentes niveles (tipos ,etc)
+* Clave binaria vs entera
+* En las migraciones se pueden codificar todas las restricciones habituales en SQL
