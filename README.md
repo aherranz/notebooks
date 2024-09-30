@@ -4,6 +4,19 @@ This repo contains some of my livebook notebooks.
 
  🇪🇸 *Este repo contiene algunos de mis cuadernos de livebooks.*
 
+## Start livebook from docker
+
+This command starts a container mounting the host working directory in
+the `/data` directory in the container.  Remember that livebook
+has access to any file and can execute any code so using this command
+at least we confine the problem to the container itself and the
+host working directory.
+
+```
+docker run -p 8080:8080 -p 8081:8081 --pull always -u $(id -u):$(id -g) -v $(pwd):/data ghcr.io/livebook-dev/livebook
+```
+
+
 ## Completed notebooks (*Cuadernos terminados*)
 
 - 🇪🇸 [chuleta_ecto.livemd](chuleta_ecto.livemd): Cuaderno usado en una
