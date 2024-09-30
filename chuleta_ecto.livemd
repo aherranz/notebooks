@@ -103,7 +103,7 @@ mix ecto.create
 * La aplicación OTP `:chuleta` está en marcha
 
 ```elixir
-hd(Application.started_applications())
+tl(Application.started_applications())
 ```
 
 * El *repositorio* está configurado
@@ -121,28 +121,28 @@ Repo.config()
 * Vamos a usar el mismo ejemplo del libro **Programming Ecto** de *Darin Wilson Eric Meadows-Jönsson*
 * Base de datos de **álbumes musicales**: artistas, álbumes, géneros, pistas
   ```mermaid
-                                  classDiagram
-                                  class Album {
-                                    id: integer [PK]
-                                    title: string [1]
-                                    released: date
-                                  }
-                                  class Artist {
-                                    id: integer [PK]
-                                    name: string [1] [unique]
-                                  }
-                                  class Genre {
-                                    id: integer [PK]
-                                    name: string [1] [unique]
-                                  }
-                                  class Track {
-                                    id: integer [PK]
-                                    title: string [1]
-                                    duration: integer
-                                  }
-                                  Album "*" -- "1" Artist
-                                  Album "*" -- "1..*" Genre
-                                  Album "1" -- "1..* {ordered}" Track
+                                                  classDiagram
+                                                  class Album {
+                                                    id: integer [PK]
+                                                    title: string [1]
+                                                    released: date
+                                                  }
+                                                  class Artist {
+                                                    id: integer [PK]
+                                                    name: string [1] [unique]
+                                                  }
+                                                  class Genre {
+                                                    id: integer [PK]
+                                                    name: string [1] [unique]
+                                                  }
+                                                  class Track {
+                                                    id: integer [PK]
+                                                    title: string [1]
+                                                    duration: integer
+                                                  }
+                                                  Album "*" -- "1" Artist
+                                                  Album "*" -- "1..*" Genre
+                                                  Album "1" -- "1..* {ordered}" Track
   ```
 * Seguro que el modelo es debatible dependiendo de lo que uno quiera entender, nos ceñimos a la semántica del diagrama, que **a mi tampoco me gusta 😀**
 
@@ -227,13 +227,13 @@ Repo.all(Artist)
 * El modelo conceptual dice que la multiplicidad de `name` es [1]
 * La migración puede incluir restricciones sobre el modelo lógico como `NOT NULL`:
   ```elixir
-                def change do
-                  create table("artists") do
-                    add(:name, :string, null: false)
+                                def change do
+                                  create table("artists") do
+                                    add(:name, :string, null: false)
 
-                    timestamps()
-                  end
-                end
+                                    timestamps()
+                                  end
+                                end
   ```
 * Vamos a hacerlo con una nueva migración
 
@@ -276,13 +276,14 @@ Repo.insert(%Artist{})
 
 ## Buscando errores más orgánicos
 
+* Hemos visto que el error no es muy orgánico, de hecho es una **excepción**
 * Proteger el modelo lógico es estupendo pero **no queremos** tener que manejar **excepciones**
 * El concepto de *changeset* nos va a ayudar con ese control de errores
   ```mermaid
-              graph TD;
-                Data[Data / Schema] -->|Changeset.change| Changeset;
-                Changeset -->|Changeset.cast, validate| Changeset;
-                Changeset -->|Repo.insert, update| Schema;
+                              graph TD;
+                                Data[Data / Schema] -->|Changeset.change| Changeset;
+                                Changeset -->|Changeset.cast, validate| Changeset;
+                                Changeset -->|Repo.insert, update| Schema;
   ```
 
 ```elixir
@@ -294,10 +295,25 @@ alias Ecto.Changeset
 |> Changeset.change()
 |> Changeset.validate_required([:name])
 |> Repo.insert()
-|> dbg()
+|> dbg
 ```
 
 * ✅ Se puede intuir lo **esencial** que resulta el *changeset* en Ecto, todo gira alrededor de este importante concepto, todos **los módulos tienen funciones que admiten o generan *changesets***
+
+## El struct Changeset
+
+* Merece la pena explorar los campos del *struct* `Ecto.Changeset.t()`:
+  * `:data` el *struct* sobre el que aplicar los cambios.
+  * `:params` *map* con los cambios que se desea realizar.
+  * `:changes` cambios ya aprobados.
+  * `:errors` errores detectados en el *casting* y validaciones.
+  * `:valid?` decide si el changeset es válido o ha habido errores.
+  * `:required` lista de campos obligatorios (multiplicidad no 0).
+  * `:action` representa la *acción* que se intenta realizar (`:insert, :update, :delete`).
+  * `:types` es un campo que permite la *introspección* de los nombres de los campos y sus tipos en el *struct*.
+  * `:empty_values` lista de valores que en el proceso de *casting* y validación se consideran vacíos.
+  * `:repo` es un valor que se devuelve en el changeset de las funciones del repo que se use.
+  * `:repo_opts` opciones que se estén empleando en el repo usado.
 
 ## Patrón: funciones que generan changesets
 
@@ -345,7 +361,7 @@ alias Chuleta.Model2.Artist
 ```elixir
 a1
 |> Artist.changeset(%{name: "Supertramp"})
-|> Repo.insert()
+|> Repo.update()
 ```
 
 * Una consulta rápida al [*Schema API* de Repo](https://hexdocs.pm/ecto/Ecto.Repo.html#schema-api) nos indica que debemos usar `update`
@@ -407,28 +423,28 @@ Repo.insert(%Artist{name: "Pink Floyd"})
 * Ecto, como otras bibliotecas, ofrece una forma de capturar las asociaciones del modelo y sus multiplicidades
 * Recordemos el modelo:
   ```mermaid
-      classDiagram
-                                  class Album {
-                                    id: integer [PK]
-                                    title: string [1]
-                                    released: date
-                                  }
-                                  class Artist {
-                                    id: integer [PK]
-                                    name: string [1] [unique]
-                                  }
-                                  class Genre {
-                                    id: integer [PK]
-                                    name: string [1] [unique]
-                                  }
-                                  class Track {
-                                    id: integer [PK]
-                                    title: string [1]
-                                    duration: integer
-                                  }
-                                  Album "*" -- "1" Artist
-                                  Album "*" -- "1..*" Genre
-                                  Album "1" -- "1..* {ordered}" Track
+                      classDiagram
+                                                  class Album {
+                                                    id: integer [PK]
+                                                    title: string [1]
+                                                    released: date
+                                                  }
+                                                  class Artist {
+                                                    id: integer [PK]
+                                                    name: string [1] [unique]
+                                                  }
+                                                  class Genre {
+                                                    id: integer [PK]
+                                                    name: string [1] [unique]
+                                                  }
+                                                  class Track {
+                                                    id: integer [PK]
+                                                    title: string [1]
+                                                    duration: integer
+                                                  }
+                                                  Album "*" -- "1" Artist
+                                                  Album "*" -- "1..*" Genre
+                                                  Album "1" -- "1..* {ordered}" Track
   ```
 * Nos llevamos el modelo a *schemas* incluyendo ahora `Artist`, `Album` y su asociación $N:1$ (**atención a `typed_schema` y al spec de changeset**)
 
@@ -552,7 +568,7 @@ tangana |> Ecto.build_assoc(:albums)
 * Vamos a crear un par de álbumes usando **dos alternativas habituales**
 
 ```elixir
-tangana |> Ecto.build_assoc(:albums, title: "Idolo", released: "2017") |> Repo.insert()
+tangana |> Ecto.build_assoc(:albums, title: "Idolo", released: "2017-10-26") |> Repo.insert()
 ```
 
 * ¡Eso era un antipatrón! (la fecha parece ser un dato externo sobre el que no se tiene control)
@@ -560,7 +576,7 @@ tangana |> Ecto.build_assoc(:albums, title: "Idolo", released: "2017") |> Repo.i
 ```elixir
 tangana
 |> Ecto.build_assoc(:albums)
-|> Album.changeset(%{title: "El Madrileño", released: "2021"})
+|> Album.changeset(%{title: "El Madrileño", released: "2021-02-26"})
 |> Repo.insert()
 ```
 
@@ -777,7 +793,17 @@ album |> Album.changeset(%{tracks: tracks}) |> Changeset.cast_assoc(:tracks) |> 
 
 ## ...Famous Last Words...
 
-* Cuidado con `Changeset.validate_required` para claves foráneas pq entonces no funcionan `Changeset.put_assoc` ni `Changeset.cast_assoc`
+* Cuidado con `Changeset.validate_required` para claves foráneas pq entonces no funcionan `Changeset.put_assoc` ni `Changeset.cast_assoc`, de hecho explícitamente pone que no se use en la documentación de [`Changeset.validate_required`](https://hexdocs.pm/ecto/Ecto.Changeset.html#validate_required/3)
+
+* **belogs_to** define una clave foránea en el modelo donde se declara mientras que **has_many** y **has_one** dependen de que haya un **belongs_to** en el *otro modelo* (es decir, una clave foránea)
+
+* `cast_assoc` y `put_assoc` se usa para *moldear* un modelo asociado y sólo se puede usar en **has_one** y **has_many**.
+
+* `cast_assoc` invocará la función de `changeset` del modelo asociado.
+
+* Cuando se tiene un **belongs_to** en un modelo y se quiere comprobar que el modelo asociado existe: `assoc_constraint` (es necesario que el modelo asociado tenga un **has_one** o un **has_many**)
+
+* Muy importante este post para poder hablar de multiplicidad mínima de 1: https://elixirforum.com/t/ecto-validating-belongs-to-association-is-not-nil/2665/5
 
 * Entender el **mapping** y los diferentes tipos (incluye listas, maps, enumerados)
 
