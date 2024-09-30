@@ -1,0 +1,34 @@
+# Azúcar
+
+## Section
+
+```elixir
+defmodule M do
+  defmacro f(do: block) do
+    quote do
+      IO.puts("Haciendo algo antes del bloque")
+
+      r = unquote(block)
+
+      IO.puts("Haciendo algo después del bloque")
+    
+      r
+    end
+  end
+end
+
+```
+
+```elixir
+require M
+  
+M.f do
+  IO.puts("Este es el bloque dentro de do-end")
+end
+
+```
+
+```elixir
+quote do f do :ok end end
+
+```

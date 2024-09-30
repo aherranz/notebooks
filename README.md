@@ -28,3 +28,11 @@ docker run -p 8080:8080 -p 8081:8081 --pull always -u $(id -u):$(id -g) -v $(pwd
 - 🇪🇸 [elixir_en_5_minutos.livemd](elixir_en_5_minutos.livemd): Cuaderno
   con una muy breve presentación de Elixir para programadores que
   vienen de paradigmas diferentes a la funcional.
+- 🇪🇸 [pf_en_elixir.livemd](pf_en_elixir.livemd): Cuaderno con un
+  taller para acercar la progrmación funcional a programadores con o
+  sin experiencia en la misma. Se tratan los elementos fundamentales
+  de la programación funcional: inmutabilidad, recursividad, pattern
+  matching y funciones de orden superior.
+- 🇪🇸 [azucar.livemd](azucar.livemd): Cuaderno con detalles sobre
+  *construcciones azucaradas* en Elixir (pipes, keywords, nombres de
+  módulos, do-end, for, etc.)

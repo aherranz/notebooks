@@ -1,0 +1,80 @@
+# Elixir en 5 minutos. Madrid ▷ Elixir
+
+```elixir
+Mix.install([])
+```
+
+## Intro
+
+* La propuesta de Javier es dar una charla para presentar Elixir a progamadores JS.
+* Inspiración: https://www.youtube.com/watch?v=fMY9-iGZYIA
+* Personalmente no me gusta el enfoque, es demasiado sintáctico así que mi propuesta es enfocarlos desde tres perspectivas:
+  * **Funcional**
+    * Transparencia referencial (se deriva la inmutabilidad y falta de estado)
+    * Orden superior
+    * Encaje de patrones
+    * Tipos algebraicos (no en elixir)
+    * Evaluación perezosa y estructuas *infinitas* (no en Elixir)
+  * **El lenguaje**
+    * Estructura de programas (módulos, funciones...)
+    * Estructuras de datos
+    * Encaje de patrones
+    * Azucar sintáctico
+  * **Concurrencia**
+  * **Elixir en el *front***
+
+## Programación Funcional
+
+Elixir es un **lenguaje funcional**. Si alguien viene de _la procedural_ (incluyo la mayor parte de los lenguajes OO) tiene **mucho que olvidar** :)
+
+El principal elemento de **computación** son las funciones **matemáticas**:
+
+> $f: A \rightarrow B$
+
+Los datos son los sospechosos habituales:
+
+* Números (_bigintegers_ + _floats_)
+* Strings (_binaries_ o secuencias de bytes)
+* Listas (de cualquier tipo)
+* Maps (claves y valores de cualquier tipo)
+
+Además hay otras estructuras algo más idiomáticas:
+
+* Átomos (constantes simbólicas o nombres que sólo son iguales a si mismos)
+* Tuplas (elementos de productos cartesianos)
+
+Y, por supuesto:
+
+* Funciones (orden superior)
+
+## Variables
+
+Las variables en Elixir también son **variables matemáticas inmutables**.
+
+**Algo a olvidar:** "las variables son son almacenes mutables".
+
+El siguiente código es una **expresión** en Elixir (las dos líneas) que podemos leer como
+
+* "$x+x$ donde $x$ es igual a $21$", o
+* "sea $x$ igual a $21$ en la expresión $x+x$".
+
+```elixir
+x = 21
+x + x
+```
+
+## Funciones y Módulos
+
+Las funciones se agrupan **necesariamente en módulos**. Lo siguiente es un módulo con una función:
+
+```elixir
+defmodule MiModulo do
+  def inc(x) do
+    x + 1
+  end
+end
+```
+
+```elixir
+MiModulo.inc(41)
+```

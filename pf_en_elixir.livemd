@@ -1,0 +1,86 @@
+<!-- livebook:{"file_entries":[{"name":"Face-surprise.svg","type":"attachment"},{"name":"anderson.png","type":"attachment"},{"name":"sorpresa.jpg","type":"attachment"}]} -->
+
+# Programación funcional en Elixir
+
+```elixir
+import Enum, only: [sum: 1]
+```
+
+## Programación funcional
+
+### Simplicidad
+
+* Datos y funciones.
+* Las funciones toman datos y devuelven datos
+* **¡Las funciones también son datos!**
+
+### ¿Qué es un programa funcional?
+
+* Un conjunto de definiciones de funciones
+* Las funciones se definen usando **composición de funciones**
+
+```elixir
+div(sum([5,6,9,3,8]), length([5,6,9,3,8]))
+```
+
+## Datos (en Elixir)
+
+Los datos en los lenguajes funcionales hay que entenderlos como construcciones sintácticas, como si siguienran una gramática
+
+### Básicos: átomos (su valor es su nombre), enteros (largos), float, strings
+
+```elixir
+:nil
+18_446_744_073_709_551_616
+3.141592653589793
+"Don't panic"
+<<69,0,0,60,28,70,64,0,64,6,177,230,192,168,0,1,192,168,0,199,222,173,190,239,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0>>
+<<195,129,110,103,101,108>>
+
+```
+
+### Complejos: tuplas, listas, *maps*
+
+```elixir
+{}
+{:ok, 42}
+{1, "dos", "III"}
+[:ok, 42]
+```
+
+## Elementos de la programación funcional
+
+* Recursividad
+* Encaje de patrones
+* Transparencia referencia e inmutabilidad
+* Orden superior
+
+## ¿Qué no tenemos?
+
+* No hay asignación
+* No hay secuencias de instrucciones (*statements*)
+* No hay bloques
+* No hay variables de memoria
+* No hay punteros
+* **¡No hay estado!**
+
+<!-- livebook:{"break_markdown":true} -->
+
+![](files/sorpresa.jpg)
+
+## Recursividad
+
+## Encaje de patrones (pattern matching)
+
+```elixir
+<<ver, typ, len::16, rest :: binary>> = <<69,0,0,60,28,70,64,0,64,6,177,230,192,168,0,1,192,168,0,199,222,173,190,239,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0>>
+{ver, typ, len}
+```
+
+## Inmutabilidad
+
+## Section
+
+## Orden superior
+
+## Modelo de computación: reducción
